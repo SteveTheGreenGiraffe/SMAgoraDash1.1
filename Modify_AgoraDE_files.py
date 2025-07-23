@@ -1240,7 +1240,7 @@ def assessLineCosts(TARGET_FILE, year):
 # HERE. Current nodal cost file has the right years in it, just need to make sure this is appropriately downselecting within it
 def processLineCosts(node, year):
 
-    NODAL_FILE = "https://github.com/user-attachments/files/21368252/Nodal_cost_file.csv"
+    NODAL_FILE = "Nodal_cost_file.csv"
     df = pd.read_csv(NODAL_FILE)
     df = df[df["Year"] == year]
     df.set_index("Node", inplace=True)

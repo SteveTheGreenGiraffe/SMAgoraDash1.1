@@ -12,7 +12,7 @@ from Modify_AgoraDE_files import expandIntRenInNode, safe_divide, processLineCos
 import numpy as np
 
 
-df = pd.read_csv("https://www.dropbox.com/scl/fi/rj0zjhajipdrn1518zas7/nodal_dem_gen_with_prices_and_categories_summed_2025_07_14_14_19.csv?rlkey=9ukpa5a0nzv45dupg22fi1bo5&st=v1b1yrkm&dl=1")
+df = pd.read_csv("nodal_dem_gen_with_prices_and_categories_summed_2025_07_14_14_19.csv")
 df["Datetime"] = pd.to_datetime(df["Datetime"], errors="raise")
 avail_years = list(df["Datetime"].dt.year.unique())
 col1, col2 = st.columns([1, 1])
@@ -52,9 +52,9 @@ displaced_positive_capture = 0
 ) = expandIntRenInNode(df, node, year)
 
 # Call gen-price deciles
-(
-    final_showGenPriceDeciles_df
-) = showGenPriceDeciles(df, year)
+#(
+#    final_showGenPriceDeciles_df
+#) = showGenPriceDeciles(df, year)
 
 
 # Call supplemental T&D cost analysis function
@@ -250,12 +250,12 @@ with col2:
 
 st.table(ex_im_impact_binned_display_df)
 
-final_showGenPriceDeciles_display_df = final_showGenPriceDeciles_df.copy()
-for col in final_showGenPriceDeciles_display_df.columns:
-    if col == "Agora price [EUR/MWh]" or col == "DE price [EUR/MWh]":
-        final_showGenPriceDeciles_display_df[col] = final_showGenPriceDeciles_display_df[col].apply(lambda x: f"{x:,.0f}" if pd.notnull(x) else "")
+#final_showGenPriceDeciles_display_df = final_showGenPriceDeciles_df.copy()
+#for col in final_showGenPriceDeciles_display_df.columns:
+#    if col == "Agora price [EUR/MWh]" or col == "DE price [EUR/MWh]":
+#        final_showGenPriceDeciles_display_df[col] = final_showGenPriceDeciles_display_df[col].apply(lambda x: f"{x:,.0f}" if pd.notnull(x) else "")
 
-st.table(final_showGenPriceDeciles_display_df)
+#st.table(final_showGenPriceDeciles_display_df)
 
 required_categories = {"solar", "onshore", "offshore", "Total", "Displaced gen."}
 
@@ -280,11 +280,11 @@ if cost_dict and required_categories.intersection(cost_dict.keys()):
     st.subheader("Cost Breakdown Table")
     st.dataframe(styled_df, hide_index=True)
 
-    chart1_df = cost_df[cost_df["Category"].isin(["solar", "onshore", "offshore", "Total"])]
-    st.subheader("Unit cost by source and total weighted (EUR/MWh)")
-    st.bar_chart(chart1_df.set_index("Category")["Unit cost (EUR/MWh)"])
+#    chart1_df = cost_df[cost_df["Category"].isin(["solar", "onshore", "offshore", "Total"])]
+#    st.subheader("Unit cost by source and total weighted (EUR/MWh)")
+#    st.bar_chart(chart1_df.set_index("Category")["Unit cost (EUR/MWh)"])
 
-    chart2_df = cost_df[cost_df["Category"].isin(["Total", "Displaced gen."])]
-    st.write("Displaced generation cost after accounting for spill")
-    st.bar_chart(chart2_df.set_index("Category")["Unit cost (EUR/MWh)"])
+#    chart2_df = cost_df[cost_df["Category"].isin(["Total", "Displaced gen."])]
+#    st.write("Displaced generation cost after accounting for spill")
+#    st.bar_chart(chart2_df.set_index("Category")["Unit cost (EUR/MWh)"])
 
