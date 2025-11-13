@@ -1,5 +1,3 @@
-# BRANCH FOR SMAgoraDash250720
-
 # Current path and command:
 # cd "C:\Users\StephenMettler\GREEN GIRAFFE Dropbox\Stephen Mettler\PC\Documents\Commercial pursuits (DT)\S4\SG"
 # python Modify_AgoraDE_files.py --mode countryPrice
@@ -11,8 +9,8 @@
 # python Modify_AgoraDE_files.py --mode expandIntRenInNode
 # python Modify_AgoraDE_files.py --mode standard_initial_series
 # python Modify_AgoraDE_files.py --mode assessLineCosts
-# python Modify_AgoraDE_files.py --mode []
-# python Modify_AgoraDE_files.py --mode []
+# python Modify_AgoraDE_files.py --mode adHocValues
+# python Modify_AgoraDE_files.py --mode estimateSystemValue
 # python Modify_AgoraDE_files.py --mode []
 # python Modify_AgoraDE_files.py --mode []
 
@@ -37,10 +35,52 @@ import argparse
 import re
 import ast
 import numpy as np
+import time
+from pandas.tseries.offsets import MonthEnd
 
 
 # Set energy destinations outside Germany
 TRADING_COUNTRIES = ["Austria", "Belgium", "Switzerland", "Czech Republic", "France", "Luxembourg", "Denmark 1", "Denmark 2", "Norway", "Netherlands", "Poland", "Sweden"]
+
+# Set central Germany T&D cost pool assumptions
+cost_pools = {
+    2019: {
+        "international_transmission_cost_pool": 225_000_000,
+        "internal_transmission_cost_pool": 5_000_000_000,
+        "internal_distribution_cost_pool": 24_000_000_000,
+        "internal_OW_link_cost_pool": 2_000_000_000,
+    },
+    2020: {
+        "international_transmission_cost_pool": 225_000_000,
+        "internal_transmission_cost_pool": 5_500_000_000,
+        "internal_distribution_cost_pool": 25_000_000_000,
+        "internal_OW_link_cost_pool": 2_000_000_000,
+    },
+    2021: {
+        "international_transmission_cost_pool": 275_000_000,
+        "internal_transmission_cost_pool": 6_000_000_000,
+        "internal_distribution_cost_pool": 26_000_000_000,
+        "internal_OW_link_cost_pool": 1_900_000_000,
+    },
+    2022: {
+        "international_transmission_cost_pool": 275_000_000,
+        "internal_transmission_cost_pool": 6_500_000_000,
+        "internal_distribution_cost_pool": 27_000_000_000,
+        "internal_OW_link_cost_pool": 2_100_000_000,
+    },
+    2023: {
+        "international_transmission_cost_pool": 275_000_000,
+        "internal_transmission_cost_pool": 7_000_000_000,
+        "internal_distribution_cost_pool": 28_000_000_000,
+        "internal_OW_link_cost_pool": 2_900_000_000,
+    },
+    2024: {
+        "international_transmission_cost_pool": 275_000_000,
+        "internal_transmission_cost_pool": 7_500_000_000,
+        "internal_distribution_cost_pool": 28_500_000_000,
+        "internal_OW_link_cost_pool": 3_300_000_000,
+    }
+}
 
 timestamp = datetime.today().strftime("%Y_%m_%d_%H_%M")
 
@@ -551,6 +591,21 @@ def showAllNodeCFs():
     for node in node_list:
         showNodeCF(TARGET_FILE, node)
 
+def adHocValues(df, year):
+    all_df = pd.read_csv(df)
+    all_df["Datetime"] = pd.to_datetime(all_df["Datetime"])
+    all_df = all_df[all_df["Datetime"].dt.year == year]
+    all_df = all_df[all_df["Selected hub"].isin(["Nordsee-West", "Neckarmündung"])]
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    filename = f"adHocValuesOutput_{stamp}.csv"
+    all_df.to_csv(f"{filename}.csv", index=False, encoding="utf-8-sig")
+
+    # Sum and print total cost and power demand, by node and in total
+    #DE_cost_by_node = all_df.groupby("Selected hub")["Total DE cost (EUR)"].sum()]
+    #print("DE cost by node: ", DE_cost_by_node)
+
+
+
 def expandIntRenInNode(df, node, year, boost_pcts=None, cost_per_mw=None, GW_in_node_by_source=None):
 
     (
@@ -778,7 +833,7 @@ def expandIntRenInNode(df, node, year, boost_pcts=None, cost_per_mw=None, GW_in_
         summary_by_source_df,
     )
 
-def assessLineCosts(TARGET_FILE, year):
+def assessLineCosts(TARGET_FILE):
 
     # Load target file
     df = pd.read_csv(TARGET_FILE)
@@ -787,7 +842,6 @@ def assessLineCosts(TARGET_FILE, year):
     df["Datetime"] = pd.to_datetime(df["Datetime"], errors="coerce")
     df["Year"] = df["Datetime"].dt.year
     print("Initial processed")
-    #df = df[df["Year"] == year].copy()
 
     df["Flow_MWh"] = np.where(
         df["Power export [MWh/hour]"] > 0,
@@ -880,6 +934,10 @@ def assessLineCosts(TARGET_FILE, year):
         how="left"
     )
 
+    # Save a spin-off CSV to be used in setting transmission line capacities
+    merged_df.to_csv("TransmissionLineCapacityIndex.csv", index=False, encoding="utf-8-sig")
+    print("Saved merged_df with transmission line capacity values")
+
     # Calculate hours in year
     merged_df["Hours in year"] = merged_df["Year"].apply(lambda y: 8784 if y in [2020, 2024] else 8760)
 
@@ -900,59 +958,9 @@ def assessLineCosts(TARGET_FILE, year):
     #merged_df.to_csv("testPreCost.csv", index=False, encoding="utf-8-sig")
     #print(f"Saved PreCost file")
 
-    # ASSIGN COSTS ------------------------------------------
-
-    # Assign transmission and distribution cost pools
-    cost_pools = {
-        2019: {
-            "international_transmission_cost_pool": 225_000_000,
-            "internal_transmission_cost_pool": 5_000_000_000,
-            "internal_distribution_cost_pool": 24_000_000_000,
-            "internal_OW_link_cost_pool": 2_000_000_000,
-        },
-        2020: {
-            "international_transmission_cost_pool": 225_000_000,
-            "internal_transmission_cost_pool": 5_500_000_000,
-            "internal_distribution_cost_pool": 25_000_000_000,
-            "internal_OW_link_cost_pool": 2_000_000_000,
-        },
-        2021: {
-            "international_transmission_cost_pool": 275_000_000,
-            "internal_transmission_cost_pool": 6_000_000_000,
-            "internal_distribution_cost_pool": 26_000_000_000,
-            "internal_OW_link_cost_pool": 1_900_000_000,
-        },
-        2022: {
-            "international_transmission_cost_pool": 275_000_000,
-            "internal_transmission_cost_pool": 6_500_000_000,
-            "internal_distribution_cost_pool": 27_000_000_000,
-            "internal_OW_link_cost_pool": 2_100_000_000,
-        },
-        2023: {
-            "international_transmission_cost_pool": 275_000_000,
-            "internal_transmission_cost_pool": 7_000_000_000,
-            "internal_distribution_cost_pool": 28_000_000_000,
-            "internal_OW_link_cost_pool": 2_900_000_000,
-        },
-        2024: {
-            "international_transmission_cost_pool": 275_000_000,
-            "internal_transmission_cost_pool": 7_500_000_000,
-            "internal_distribution_cost_pool": 28_500_000_000,
-            "internal_OW_link_cost_pool": 3_300_000_000,
-        }
-    }
-
-    # HERE: Need to rework this thing to run for all years, selecting right cost base for each
-    
-    #Original, to delete when all working
-    #international_transmission_cost_pool = 225_000_000
-    #internal_transmission_cost_pool = 6_500_000_000
-    internal_distribution_cost_pool = 25_000_000_000
-    #internal_OW_link_cost_pool = 2_250_000_000
-
-    # Between the two nodes, in 2024 Nordsee-West appeared to have around 75% the OW generation capacity and NOS 25%, so set based on that. Could divide in any given year by share of generation
+    # Between the two nodes, in 2024 Nordsee-West appeared to have around 65% the OW generation capacity and NOS 35%, so set based on that. Could divide in any given year by share of generation
     internal_DE_nodes_with_OW_links = {
-        (node, yr): share * cost_pools[year]["internal_OW_link_cost_pool"]
+        (node, yr): share * cost_pools[yr]["internal_OW_link_cost_pool"]
         for yr in range(2019, 2025)  # 2025 excluded → ends at 2024
         for node, share in {
             "Nord-Ost-See": .35,
@@ -978,6 +986,7 @@ def assessLineCosts(TARGET_FILE, year):
     )
     
     # Look up correct cost pool
+    print("Got here")
     def get_international_cost(year):
         return cost_pools.get(year, {}).get("international_transmission_cost_pool", 0)
     
@@ -1144,7 +1153,7 @@ def assessLineCosts(TARGET_FILE, year):
 
     capacity_df["Sum peak DE yearly GW DSO capacity"] = capacity_df.groupby("Year")["99%ile demand [MW]"].transform("sum")
     capacity_df["Demand share"] = capacity_df["99%ile demand [MW]"] / capacity_df["Sum peak DE yearly GW DSO capacity"]
-    capacity_df["Domestic distribution cost"] = capacity_df["Demand share"] * internal_distribution_cost_pool
+    capacity_df["Domestic distribution cost"] = capacity_df["Demand share"] * cost_pools["internal_distribution_cost_pool"]
     capacity_df = capacity_df.merge(
         annual_nodal_demand,
         left_on=["Node", "Year"],
@@ -1167,9 +1176,6 @@ def assessLineCosts(TARGET_FILE, year):
     )
     capacity_df["Annual total generation [GWh]"] = capacity_df["Annual total generation [GWh]"].fillna(0)
 
-    #capacity_df = capacity_df[capacity_df["Year"] == year].copy()
-    #print("Here?")
-
     capacity_df["OW cost"] = 0  # Init to zero
 
     for (node, yr), cost in internal_DE_nodes_with_OW_links.items():
@@ -1178,8 +1184,8 @@ def assessLineCosts(TARGET_FILE, year):
             "OW cost"
         ] += cost
 
-    #capacity_df.to_csv("capacityTest.csv", index=False, encoding="utf-8-sig")
-    #print(f"Saved capacityTest")
+    capacity_df.to_csv("capacityTest.csv", index=False, encoding="utf-8-sig")
+    print(f"Saved capacityTest")
 
     
     # COMBINE internal_node_df, ALL NODES INSIDE GERMANY, WITH merged_df DATA ON TRANSMISSION INTO EACH NODE ------------------------------------------
@@ -1202,7 +1208,6 @@ def assessLineCosts(TARGET_FILE, year):
         .reset_index()
         .rename(columns={"To": "Node"})
     )
-
 
     capacity_df = capacity_df.merge(grouped, on=["Node", "Year"], how="left")
     #capacity_df = capacity_df[capacity_df["Year"] == year].copy()
@@ -1232,12 +1237,230 @@ def assessLineCosts(TARGET_FILE, year):
 
         capacity_df.at[i, "Sum domestically exported GWh"] = exported_sum
 
-    # TAG: SM - Normally saves nodal cost file here for passing to processLineCosts, but now setting that one to run directly from the already-run Nodal_cost_file
-    #capacity_df.to_csv("Nodal_cost_file.csv", index=False, encoding="utf-8-sig")
-    #print(f"Saved nodal cost file")
+    capacity_df.to_csv("Nodal_cost_file.csv", index=False, encoding="utf-8-sig")
+    print(f"Saved nodal cost file")
+
+# Tag:Here
+def estimateSystemValue(file, start_year, start_month, end_year, end_month):
+
+    # --- Data processing ---
+
+    # Load data
+    df_full = pd.read_csv(file)
+    df_full.columns = df_full.columns.str.strip()
+    
+    # Ensure price column exists and is numeric
+    price_col = "Agora wholesale price [EUR/MWh]"
+    df_full[price_col] = pd.to_numeric(df_full[price_col], errors="coerce")
+    
+    df_full["Datetime"] = pd.to_datetime(df_full["Datetime"], errors="coerce")
+    df_full = df_full.dropna(subset=["Datetime"])
+
+    # Year/MonthNum for merge
+    df_full["Year"] = df_full["Datetime"].dt.year
+    df_full["MonthNum"] = df_full["Datetime"].dt.month
 
 
-# HERE. Current nodal cost file has the right years in it, just need to make sure this is appropriately downselecting within it
+    # --- Calculate annual grid cost and throughput base ---
+
+    annual_grid = []
+
+    for year, grp in df_full.groupby("Year"):
+        if year not in cost_pools:
+            continue  # skip years without cost data
+
+        grid_cost = (
+            cost_pools[year]["internal_transmission_cost_pool"]
+            + cost_pools[year]["internal_distribution_cost_pool"]
+        )
+
+        # Total MWh throughput in that year (all hubs)
+        grid_throughput = 1_000 * grp["Total electricity demand"].sum()
+
+        if grid_throughput > 0:
+            unit_cost = grid_cost / grid_throughput  # €/MWh
+        else:
+            unit_cost = 0.0
+
+        annual_grid.append(
+            {
+                "Year": year,
+                "grid_cost_EUR": grid_cost,
+                "grid_unit_cost_per_MWh": unit_cost,
+            }
+        )
+
+    annual_grid_df = pd.DataFrame(annual_grid)
+
+
+    # --- Filter dataframe to selected ---
+    
+    start_dt = pd.Timestamp(start_year, start_month, 1)
+    end_dt = pd.Timestamp(end_year, end_month, 1) + MonthEnd(1) + pd.Timedelta(hours=1)
+
+    df = df_full[(df_full["Datetime"] >= start_dt) & (df_full["Datetime"] < end_dt)].copy()
+
+    price_col = "Agora wholesale price [EUR/MWh]"
+    df[price_col] = pd.to_numeric(df[price_col], errors="coerce")
+
+    # --- Price processing inputs ---
+
+    # Load price input data
+    prices_df = pd.read_csv("fuel_and_ETS_price_assumptions_19_24.csv")
+    prices_df.columns = prices_df.columns.str.strip()
+    prices_df["Month_dt"] = pd.to_datetime(prices_df["Month"], format="%Y-%m")
+    prices_df["Year"] = prices_df["Month_dt"].dt.year
+    prices_df["MonthNum"] = prices_df["Month_dt"].dt.month
+
+    # Tag: To delete parts of this overruled by new functionality once ready
+    RFNBO_price_threshold = 20  # Option A €/MWh defined by RFNBO as indicating excess clean power available
+    RFNBO_emission_ratio_threshold = 0.36  # Emission ratio, times ETS price, setting Option B €/MWh defined by RFNBO as indicating excess clean power available
+
+    # Generator stack definition
+    base_stack = pd.DataFrame([
+        # Tech,       Eff_class,   Fuel_type,  Var_OM,  Eff,    CO2_int
+        ("Lignite",   "Lowest",    "lignite",   4.0,    0.33,   1.10),
+        ("Lignite",   "Highest",   "lignite",   4.0,    0.43,   0.95),
+        ("Hard coal", "Lowest",    "hard_coal", 4.0,    0.36,   0.95),
+        ("Hard coal", "Highest",   "hard_coal", 4.0,    0.46,   0.70),
+        ("CCGT",      "Lowest",    "gas",       3.0,    0.55,   0.42),
+        ("CCGT",      "Highest",   "gas",       3.0,    0.62,   0.33),
+        ("OCGT",      "Lowest",    "gas",       7.5,    0.35,   0.60),
+        ("OCGT",      "Highest",   "gas",       7.5,    0.42,   0.45),
+    ], columns=[
+        "Tech",
+        "Efficiency_class",
+        "Fuel_type",
+        "Var_OM_EUR_per_MWh",
+        "Efficiency",
+        "CO2_intensity_t_per_MWh_el",
+    ])
+    
+    # --- Run price processing on downward and upward regulation opportunities ---
+
+    # Downward rationale: Add a new electricity load to grid that runs at all times except when price exceeds given max. threshold
+    # Upward rationale: Add a new electricity load to grid that runs only when price is below given min. threshold
+    # Objective: raise  MWh throughput on grid, without exacerbating peak demand; downward vs. upward depends on given asset's capital vs. electricity cost intensity
+
+    # Tag: For now, just assuming current-system marginal cost per MWh throughput is the saving. In reality, this will have diminishing marginal returns, but negligible at small scales
+
+    def compute_monthly_thresholds(prices_df, base_stack):
+        rows = []
+
+        for _, r in prices_df.iterrows():
+            ets = r["EUA €/tCO2"]
+
+            fuel_cost = {
+                "lignite":   r["Lignite €/MWh"],
+                "hard_coal": r["Hard coal €/MWh"],
+                "gas":       r["Natural gas €/MWh"],
+            }
+
+            stack = base_stack.copy()
+            stack["Fuel_input_cost_EUR_per_MWhth"] = stack["Fuel_type"].map(fuel_cost)
+
+            fuel_term = stack["Fuel_input_cost_EUR_per_MWhth"] / stack["Efficiency"]
+            co2_term = stack["CO2_intensity_t_per_MWh_el"] * ets
+            srmc = fuel_term + stack["Var_OM_EUR_per_MWh"] + co2_term
+            stack["SRMC_EUR_per_MWh"] = srmc
+
+            all_disp_min = srmc.min()
+            all_disp_max = srmc.max()
+            disp_ex_OCGT_max = stack.loc[stack["Tech"] != "OCGT", "SRMC_EUR_per_MWh"].max()
+
+            rfnbo_threshold = max(RFNBO_price_threshold, (ets * RFNBO_emission_ratio_threshold))
+
+            rows.append({
+                "Year": int(r["Year"]),
+                "MonthNum": int(r["MonthNum"]),
+                "all_disp_min": all_disp_min,
+                "all_disp_max": all_disp_max,
+                "disp_ex_OCGT_max": disp_ex_OCGT_max,
+                "RFNBO_threshold": rfnbo_threshold,
+            })
+
+        return pd.DataFrame(rows)
+
+    monthly_thresh = compute_monthly_thresholds(prices_df, base_stack)
+    monthly_thresh.to_csv("monthly_thresholds_by_hub.csv", index=False, encoding="utf-8-sig")
+
+    # Attach thresholds to hourly df
+
+    df["Datetime"] = pd.to_datetime(df["Datetime"], errors="raise")
+    df["Year"] = df["Datetime"].dt.year
+    df["MonthNum"] = df["Datetime"].dt.month
+
+    df = df.merge(
+        monthly_thresh,
+        on=["Year", "MonthNum"],
+        how="left",
+        validate="many_to_one"
+    )
+
+    df["H_above_all_disp_max"]      = df[price_col] > df["all_disp_max"]
+    df["H_NOT_above_all_disp_max"]      = df[price_col] < df["all_disp_max"]
+    df["H_above_disp_ex_OCGT_max"]  = df[price_col] > df["disp_ex_OCGT_max"]
+    df["H_NOT_above_disp_ex_OCGT_max"]      = df[price_col] < df["disp_ex_OCGT_max"]
+    df["H_below_all_disp_min"]      = df[price_col] < df["all_disp_min"]
+    df["H_below_RFNBO_min"]         = df[price_col] < df["RFNBO_threshold"]
+
+    monthly_hub_summary = (
+        df
+        .groupby(["Year", "MonthNum", "Selected hub"])
+        .agg(
+            # Threshold values
+            T_all_disp_max     = ("all_disp_max", "mean"),
+            T_disp_ex_OCGT_max = ("disp_ex_OCGT_max", "mean"),
+            T_all_disp_min     = ("all_disp_min", "mean"),
+            T_RFNBO_min        = ("RFNBO_threshold", "mean"),
+
+            # Hour counts
+            H_above_all_disp_max     = ("H_above_all_disp_max", "sum"),
+            H_NOT_above_all_disp_max     = ("H_NOT_above_all_disp_max", "sum"),
+            H_above_disp_ex_OCGT_max = ("H_above_disp_ex_OCGT_max", "sum"),
+            H_NOT_above_disp_ex_OCGT_max = ("H_NOT_above_disp_ex_OCGT_max", "sum"),
+            H_below_all_disp_min     = ("H_below_all_disp_min", "sum"),
+            H_below_RFNBO_min        = ("H_below_RFNBO_min", "sum"),
+            Hours_total              = ("Datetime", "nunique"),
+        )
+        .reset_index()
+    )
+
+    for col in [
+        "H_NOT_above_all_disp_max",
+        "H_NOT_above_disp_ex_OCGT_max",
+        "H_below_all_disp_min",
+        "H_below_RFNBO_min",
+    ]:
+        monthly_hub_summary[col + "_share"] = (
+            monthly_hub_summary[col] / monthly_hub_summary["Hours_total"]
+        )
+    
+    monthly_hub_summary = monthly_hub_summary.merge(
+        annual_grid_df[["Year", "grid_unit_cost_per_MWh"]],
+        on="Year",
+        how="left",
+        validate="many_to_one",
+    )
+    
+    for col in [
+        "H_NOT_above_all_disp_max",
+        "H_NOT_above_disp_ex_OCGT_max",
+        "H_below_all_disp_min",
+        "H_below_RFNBO_min",
+    ]:
+        monthly_hub_summary[col + "_value"] = (
+            monthly_hub_summary[col] * monthly_hub_summary["grid_unit_cost_per_MWh"]
+        )
+
+    monthly_hub_summary.to_csv("monthly_threshold_hours_by_hub.csv", index=False, encoding="utf-8-sig")
+    return monthly_hub_summary, df
+
+
+
+
+
+#Current nodal cost file has the right years in it, just need to make sure this is appropriately downselecting within it
 def processLineCosts(node, year):
 
     NODAL_FILE = "Nodal_cost_file.csv"
@@ -1288,7 +1511,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run sheet processing")
     parser.add_argument(
-        "--mode", choices=["countryPrice", "standard_initial_series", "exportEarnings", "showSumExportsByCountry", "costSumInsideDE", "assessLineCosts", "showCostSumInsideDE", "sumDisplacable", "expandIntRenInNode", "showAllNodeCFs"], required=True,
+        "--mode", choices=["countryPrice", "standard_initial_series", "estimateSystemValue", "exportEarnings", "adHocValues", "showSumExportsByCountry", "costSumInsideDE", "assessLineCosts", "showCostSumInsideDE", "sumDisplacable", "expandIntRenInNode", "showAllNodeCFs"], required=True,
         help="Which mode to run"
     )
     args = parser.parse_args()
@@ -1305,13 +1528,18 @@ if __name__ == "__main__":
         elif args.mode == "costSumInsideDE":
             costSumInsideDE()
         elif args.mode == "showCostSumInsideDE":
+            #showCostSumInsideDE("nodal_dem_and_gen_w_prices_added_2025_07_11_16_07.csv")
             showCostSumInsideDE()
         elif args.mode == "sumDisplacable":
             sumDisplacable()
+        elif args.mode == "adHocValues":
+            adHocValues("nodal_dem_and_gen_w_prices_added_2025_07_11_16_07.csv", 2024)
+        elif args.mode == "estimateSystemValue":
+            estimateSystemValue()
         elif args.mode == "expandIntRenInNode":
             expandIntRenInNode()
         elif args.mode == "assessLineCosts":
-            assessLineCosts("merged_price_flows_only_2025_07_11_16_07.csv", 2024)
+            assessLineCosts("merged_price_flows_only_2025_07_11_16_07.csv")
         elif args.mode == "showAllNodeCFs":
             showAllNodeCFs()
 
